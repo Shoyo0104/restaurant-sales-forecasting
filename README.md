@@ -1,14 +1,6 @@
 # Restaurant Sales Forecasting (Portfolio Project)
 
-## ⚠️ This data is simulated, not from a real restaurant
-
-Every number in this repository — daily sales, covers, average check, weather, labor cost — is
-**synthetically generated** by [`src/simulate_restaurant_sales.py`](src/simulate_restaurant_sales.py).
-No real point-of-sale, financial, or transaction data is used or reproduced anywhere in this
-project. The simulation's effect sizes (weekend lift, seasonality, weather sensitivity, promo
-impact) are calibrated to rough, order-of-magnitude patterns recalled from personal experience
-working as a line cook at **a casual-dining restaurant** — the restaurant is intentionally left
-unnamed throughout this project, and no real business's actual figures are used or claimed.
+Data is simulated by [`src/simulate_restaurant_sales.py`](src/simulate_restaurant_sales.py), calibrated to patterns recalled from working as a line cook at a casual-dining restaurant — no real POS or financial data.
 
 ## Project goal
 
