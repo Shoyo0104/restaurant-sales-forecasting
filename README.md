@@ -41,8 +41,8 @@ src/            simulate_restaurant_sales.py
    the data is written out.
 4. **EDA** — day-of-week and monthly patterns, weather and special-day impact, trend/seasonal
    decomposition, and a missing-data audit.
-5. **Forecasting** — SARIMA and XGBoost (with lag/rolling features) compared on a time-based
-   90-day holdout (no shuffling).
+5. **Forecasting** — SARIMA, XGBoost (with lag/rolling features), and Ridge regression (linear,
+   with Fourier seasonality terms) compared on a time-based 90-day holdout (no shuffling).
 
 ## Calibration approach
 
@@ -67,14 +67,20 @@ Time-based 90-day holdout (2026-04-21 to 2026-07-19), no shuffling:
 |---|---|---|
 | SARIMA (order (1,1,1), weekly seasonal (1,1,1,7)) | $1,445 | 14.4% |
 | **XGBoost** (lag 1/7/14/28, rolling means, calendar/weather features) | **$959** | **11.7%** |
+| Ridge (linear, Fourier seasonality + lag/rolling features) | $1,012 | 12.4% |
 
-**XGBoost wins**, with ~34% lower MAE. SARIMA's seasonal term only models the weekly cycle
-(period=365 is computationally impractical for daily-frequency state-space SARIMA), so it has no
-direct way to see the October peak, summer trough, or one-off special-day spikes — only what
-differencing and trend infer indirectly. XGBoost has direct access to those signals as engineered
-features (calendar flags, weather, multi-horizon lags), which is where its accuracy edge comes
-from. See [`notebooks/02_modeling.ipynb`](notebooks/02_modeling.ipynb) for the full comparison and
-forecast plot.
+**XGBoost wins**, but only narrowly over Ridge (~6% lower MAE) — both comfortably beat SARIMA by
+30%+. The more interesting result is how close Ridge gets: once seasonality is handed to a linear
+model explicitly as Fourier terms (instead of relying on the model to infer it), a plain
+regularized linear model gets most of the way to tree-based performance. XGBoost's remaining edge
+likely comes from modeling interactions for free via splits (e.g. weather effects compounding
+differently on weekends vs. weekdays) that a linear model would need explicit interaction terms
+to capture. SARIMA lags both because its seasonal term only covers the weekly cycle — a full
+annual seasonal order (period=365) is computationally impractical for daily-frequency state-space
+SARIMA, so it has no direct way to see the October peak, summer trough, or special-day spikes,
+only what differencing and trend infer indirectly. See
+[`notebooks/02_modeling.ipynb`](notebooks/02_modeling.ipynb) for the full comparison and forecast
+plot.
 
 *Caveat: these MAE/MAPE numbers reflect a simulation with effect sizes chosen by the author — they
 demonstrate methodology, not a claim about real-world forecast accuracy for any actual restaurant.*
@@ -86,8 +92,10 @@ demonstrate methodology, not a claim about real-world forecast accuracy for any 
 - **Summer is the slowest season, not the busiest** — sales trough in July/August and recover to
   a peak in October, a ~15-20% swing, contrary to the "patio season" assumption often made about
   casual dining.
-- **XGBoost outperforms SARIMA by ~34% MAE** on the holdout because it can directly use calendar,
-  weather, and special-day features that a weekly-seasonal SARIMA model can't easily represent.
+- **XGBoost and Ridge both beat SARIMA by 30%+ MAE** on the holdout because they can directly use
+  calendar, weather, and special-day features that a weekly-seasonal SARIMA model can't easily
+  represent — and once seasonality is Fourier-encoded, a plain linear model (Ridge) nearly
+  matches XGBoost's accuracy.
 - **Missing data is structured, not random** — it's concentrated in simulated POS-outage days and
   known annual closures, which changes how it should be handled (explicit zero vs. interpolation)
   rather than being safely ignorable.
