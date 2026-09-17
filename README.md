@@ -1,12 +1,10 @@
 # Restaurant Sales Forecasting (Portfolio Project)
 
-Data is simulated by [`src/simulate_restaurant_sales.py`](src/simulate_restaurant_sales.py), calibrated to patterns recalled from working as a line cook at a casual-dining restaurant — no real POS or financial data.
+Data is simulated by [`src/simulate_restaurant_sales.py`](src/simulate_restaurant_sales.py), calibrated to patterns I picked up working as a line cook at a casual-dining restaurant — no real POS or financial data here.
 
-## Project goal
+## Why this project
 
-Build a complete, interview-ready data analyst portfolio project end to end: a calibrated sales
-simulation, exploratory analysis, two forecasting approaches compared on a proper holdout, and a
-clean repo structure — demonstrating the full workflow rather than just a polished notebook.
+Wanted something more than a Kaggle dataset + notebook for my portfolio, so I built the whole pipeline myself: calibrate a simulation off real-world patterns, generate the data, explore it, then compare a few forecasting approaches on a proper holdout. Goal was to show the full workflow, not just a chart.
 
 ## Repo structure
 
@@ -18,79 +16,52 @@ src/            simulate_restaurant_sales.py
 
 ## Methodology
 
-1. **Calibration interview** — before writing any simulation code, real-world *patterns* (not
-   figures) were gathered: typical weekday vs. weekend volume, average check size, the
-   weekend/weekday sales ratio, seasonal shape across the year, weather sensitivity, promo
-   frequency/impact, and staffing patterns. Ambiguous or vague answers were followed up on
-   rather than filled in with assumptions.
-2. **Simulation** — ~940 days of daily data generated with `numpy`/`pandas`: day-of-week effects,
-   a custom monthly seasonal curve, a simulated weather variable, promo/special-day flags,
-   Poisson-distributed covers, lognormal check sizes, and a small number of intentionally messy
-   days (simulated POS outages, partial-field gaps, and real closures) so the analysis notebook
-   has genuine cleaning work to do.
-3. **Validation** — the simulation script prints the weekend/weekday sales ratio and the
-   summer-trough vs. October-peak swing, and checks each against the calibration targets before
-   the data is written out.
-4. **EDA** — day-of-week and monthly patterns, weather and special-day impact, trend/seasonal
-   decomposition, and a missing-data audit.
-5. **Forecasting** — SARIMA, XGBoost (with lag/rolling features), and Ridge regression (linear,
-   with Fourier seasonality terms) compared on a time-based 90-day holdout (no shuffling).
+Before writing any code I did a calibration pass on myself — what's a slow weekday actually look like, what's a busy weekend, does check size move on weekends or is it just more covers, that kind of thing. Where an answer was vague I pushed for a follow-up instead of just guessing at a number.
+
+From there:
+- Generated ~940 days with numpy/pandas — day-of-week effects, a monthly seasonal curve, a weather variable, promo/special days, Poisson covers, lognormal check sizes.
+- Threw in some messy days on purpose (a few simulated POS outages, a couple of partial-field gaps, real closures) so there's actual cleaning work to do in the EDA notebook, not a dataset that's already spotless.
+- The simulation script checks itself — it prints the weekend/weekday ratio and the summer-vs-October swing and compares them against the targets from the calibration step.
+- EDA covers day-of-week/monthly patterns, weather and special-day impact, a trend/seasonal decomposition, and the missing-data situation.
+- Forecasting: SARIMA, XGBoost, and Ridge regression, compared on a 90-day time-based holdout (no shuffling — it's daily sequential data).
 
 ## Calibration approach
 
-| Parameter | Simulated value | Source |
+| Parameter | Simulated value | Where it came from |
 |---|---|---|
-| Weekday sales | ~$5,000-6,000/day | Recalled pattern |
-| Weekend sales | ~$10,000-12,000/day | Recalled pattern |
-| Weekend/weekday ratio | ~2.0x | Derived from the above, used as a validation target |
-| Average check | $25-30/person, bigger on weekends | Recalled pattern |
-| Seasonal shape | Summer = yearly low, October = peak, shallow January dip | Recalled pattern (notably *not* the "summer patio bump" often assumed for casual dining) |
-| Seasonal swing | ~15-20% (summer trough to October peak) | Estimated via back-of-house staffing headcount ratios (summer staffing ~15-20% lighter than regular season) |
-| Weather sensitivity | Rain -5 to -8%, heavy rain -10 to -15%, snow -25 to -35% | Recalled directional pattern ("rain slows people down a bit"), magnitude grounded in [published restaurant industry weather-impact data](https://www.teamupwithliberty.com/post/how-weather-affects-restaurants-sales) for a comparable Pacific-Northwest-style climate |
-| Promos | Summer-long deal (diffuse, modest lift), Thanksgiving & Christmas-week turkey dinner (treated as special-day tier), one signature annual promo/charity day (slight YoY uptrend) | Recalled pattern: "not much promo" outside these |
-| Labor cost | Managed to a 25-33% of sales target band | Recalled policy; modeled as a noisy target rather than a bottom-up buildup since front-of-house staffing and wage data weren't available (only back-of-house headcount patterns were) |
-| Special/closure days | Dec 25 closed every year; Mother's/Father's Day at $20-25k; one-off demand windows for graduation season and a 2026 major sporting event, both anonymized | Recalled pattern |
+| Weekday sales | ~$5,000-6,000/day | recalled |
+| Weekend sales | ~$10,000-12,000/day | recalled |
+| Weekend/weekday ratio | ~2.0x | derived from the above, used as the validation target |
+| Average check | $25-30/person, bigger on weekends | recalled |
+| Seasonal shape | summer = low point of the year, climbs to a peak in October, a shallower dip in January | recalled — honestly the opposite of the "summer patio bump" I expected before asking |
+| Seasonal swing | ~15-20%, summer trough to October peak | back-of-house staffing headcount was the best proxy I had — summer schedules run about 15-20% lighter |
+| Weather | rain -5 to -8%, heavy rain -10 to -15%, snow -25 to -35% | direction was recalled ("rain slows people down a bit"), magnitude pulled from [published restaurant weather-impact data](https://www.teamupwithliberty.com/post/how-weather-affects-restaurants-sales) for a similar climate |
+| Promos | summer-long deal, Thanksgiving/Christmas turkey dinner (special-day tier), one annual signature promo day (slight YoY uptrend) | recalled — not a promo-heavy place outside of these |
+| Labor cost | kept to a 25-33% of sales target band | this one's a target-band approximation, not a real buildup — I only had back-of-house headcount, not FOH or wage data |
+| Special days / closures | closed every Dec 25, Mother's/Father's Day around $20-25k, plus one-off windows for grad season and a 2026 major sporting event (anonymized) | recalled |
 
 ## Model comparison
 
-Time-based 90-day holdout (2026-04-21 to 2026-07-19), no shuffling:
+90-day holdout, 2026-04-21 to 2026-07-19, no shuffling:
 
 | Model | MAE | MAPE |
 |---|---|---|
-| SARIMA (order (1,1,1), weekly seasonal (1,1,1,7)) | $1,445 | 14.4% |
-| **XGBoost** (lag 1/7/14/28, rolling means, calendar/weather features) | **$959** | **11.7%** |
-| Ridge (linear, Fourier seasonality + lag/rolling features) | $1,012 | 12.4% |
+| SARIMA (1,1,1)(1,1,1,7) | $1,445 | 14.4% |
+| XGBoost | $959 | 11.7% |
+| Ridge (linear + Fourier terms) | $1,012 | 12.4% |
 
-**XGBoost wins**, but only narrowly over Ridge (~6% lower MAE) — both comfortably beat SARIMA by
-30%+. The more interesting result is how close Ridge gets: once seasonality is handed to a linear
-model explicitly as Fourier terms (instead of relying on the model to infer it), a plain
-regularized linear model gets most of the way to tree-based performance. XGBoost's remaining edge
-likely comes from modeling interactions for free via splits (e.g. weather effects compounding
-differently on weekends vs. weekdays) that a linear model would need explicit interaction terms
-to capture. SARIMA lags both because its seasonal term only covers the weekly cycle — a full
-annual seasonal order (period=365) is computationally impractical for daily-frequency state-space
-SARIMA, so it has no direct way to see the October peak, summer trough, or special-day spikes,
-only what differencing and trend infer indirectly. See
-[`notebooks/02_modeling.ipynb`](notebooks/02_modeling.ipynb) for the full comparison and forecast
-plot.
+XGBoost comes out on top, but Ridge is only about $50 MAE behind it — closer than I expected going in. Once seasonality is fed to Ridge explicitly as Fourier terms instead of leaving it to figure out on its own, a plain linear model gets most of the way to tree-based accuracy. XGBoost's edge is probably from picking up interactions on its own (e.g. weather hitting weekends differently than weekdays) that Ridge would need hand-built interaction terms for.
 
-*Caveat: these MAE/MAPE numbers reflect a simulation with effect sizes chosen by the author — they
-demonstrate methodology, not a claim about real-world forecast accuracy for any actual restaurant.*
+SARIMA trails both by a fair bit. Its seasonal term is weekly only (`(1,1,1,7)`) — a full annual seasonal order is not really feasible for daily-frequency SARIMA — so it has no way to directly see the October peak or the summer trough, only whatever trend/differencing happens to pick up. Full comparison and the forecast plot are in [`notebooks/02_modeling.ipynb`](notebooks/02_modeling.ipynb).
 
-## Headline findings (simulated data)
+(Worth repeating: these are simulated numbers with effect sizes I chose, so treat the MAE/MAPE as a demo of the methodology, not a real accuracy claim.)
 
-- **Weekend sales run ~2x weekday sales**, matching the calibration target derived from recalled
-  volume patterns.
-- **Summer is the slowest season, not the busiest** — sales trough in July/August and recover to
-  a peak in October, a ~15-20% swing, contrary to the "patio season" assumption often made about
-  casual dining.
-- **XGBoost and Ridge both beat SARIMA by 30%+ MAE** on the holdout because they can directly use
-  calendar, weather, and special-day features that a weekly-seasonal SARIMA model can't easily
-  represent — and once seasonality is Fourier-encoded, a plain linear model (Ridge) nearly
-  matches XGBoost's accuracy.
-- **Missing data is structured, not random** — it's concentrated in simulated POS-outage days and
-  known annual closures, which changes how it should be handled (explicit zero vs. interpolation)
-  rather than being safely ignorable.
+## A few things that stood out
+
+- Weekend sales land around 2x weekday sales, matching what I set out to hit.
+- Summer is actually the slow season here, not the busy one — sales dip in July/August and climb back up through October. Not what I assumed before doing the calibration interview.
+- XGBoost and Ridge both beat SARIMA by 30%+ on MAE, and Ridge gets surprisingly close to XGBoost once seasonality is hand-fed to it as Fourier terms.
+- The missing data isn't random — it clusters around a handful of simulated outages and the yearly closures, so the cleaning approach has to treat "closed" (a real zero) differently from "outage" (unknown, needs imputing).
 
 ## Reproducing
 
