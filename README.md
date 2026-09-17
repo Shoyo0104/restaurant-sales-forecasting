@@ -16,7 +16,7 @@ src/            simulate_restaurant_sales.py
 
 ## Methodology
 
-Before writing any code I did a calibration pass on myself — what's a slow weekday actually look like, what's a busy weekend, does check size move on weekends or is it just more covers, that kind of thing. Where an answer was vague I pushed for a follow-up instead of just guessing at a number.
+Before writing any code I did a calibration pass on myself — what's a slow weekday actually look like, what's a busy weekend, does check size move on weekends or is it just more covers, that kind of thing.
 
 From there:
 - Generated ~940 days with numpy/pandas — day-of-week effects, a monthly seasonal curve, a weather variable, promo/special days, Poisson covers, lognormal check sizes.
