@@ -21,8 +21,7 @@ src/            simulate_restaurant_sales.py
 1. **Calibration interview** — before writing any simulation code, real-world *patterns* (not
    figures) were gathered: typical weekday vs. weekend volume, average check size, the
    weekend/weekday sales ratio, seasonal shape across the year, weather sensitivity, promo
-   frequency/impact, and staffing patterns. Ambiguous or vague answers were followed up on
-   rather than filled in with assumptions.
+   frequency/impact, and staffing patterns.
 2. **Simulation** — ~940 days of daily data generated with `numpy`/`pandas`: day-of-week effects,
    a custom monthly seasonal curve, a simulated weather variable, promo/special-day flags,
    Poisson-distributed covers, lognormal check sizes, and a small number of intentionally messy
