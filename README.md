@@ -16,11 +16,11 @@ src/            simulate_restaurant_sales.py
 
 ## Methodology
 
-Before writing any code I did a calibration pass on myself — what's a slow weekday actually look like, what's a busy weekend, does check size move on weekends or is it just more covers, that kind of thing.
+The starting point was my own experience working as a line cook at a casual-dining restaurant — what a slow weekday looks like versus a busy weekend, how check size moves, what seasons are actually slow, how weather and promos affect traffic, how staffing gets adjusted. That's what the simulation is calibrated against, rather than arbitrary numbers.
 
 From there:
 - Generated ~940 days with numpy/pandas — day-of-week effects, a monthly seasonal curve, a weather variable, promo/special days, Poisson covers, lognormal check sizes.
-- Threw in some messy days on purpose (a few simulated POS outages, a couple of partial-field gaps, real closures) so there's actual cleaning work to do in the EDA notebook, not a dataset that's already spotless.
+- Included a handful of incomplete days (a few simulated POS outages, some partial-field gaps, and real closures) since that's the kind of data-quality issue an analyst normally has to deal with, not something to pretend away.
 - The simulation script checks itself — it prints the weekend/weekday ratio and the summer-vs-October swing and compares them against the targets from the calibration step.
 - EDA covers day-of-week/monthly patterns, weather and special-day impact, a trend/seasonal decomposition, and the missing-data situation.
 - Forecasting: SARIMA, XGBoost, and Ridge regression, compared on a 90-day time-based holdout (no shuffling — it's daily sequential data).
