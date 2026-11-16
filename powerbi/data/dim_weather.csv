@@ -1,0 +1,5 @@
+weather_key,weather,weather_label
+1,clear,Clear
+2,rain,Rain
+3,heavy_rain,Heavy Rain
+4,snow,Snow

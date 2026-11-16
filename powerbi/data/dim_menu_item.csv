@@ -1,0 +1,41 @@
+item_key,item_id,item_name,category,price,food_cost
+1,1,Loaded Potato Skins,Appetizers,9.50,2.80
+2,2,Mozzarella Sticks,Appetizers,8.75,2.40
+3,3,Buffalo Wings,Appetizers,11.50,3.60
+4,4,Spinach Artichoke Dip,Appetizers,9.95,2.70
+5,5,Nachos Supreme,Appetizers,12.50,3.90
+6,6,Calamari,Appetizers,13.50,4.50
+7,7,Classic Cheeseburger,Burgers,13.95,4.10
+8,8,Bacon BBQ Burger,Burgers,15.50,4.70
+9,9,Mushroom Swiss Burger,Burgers,14.75,4.40
+10,10,Veggie Burger,Burgers,13.25,3.80
+11,11,Double Stack Burger,Burgers,17.50,5.60
+12,12,Spicy Jalapeno Burger,Burgers,14.95,4.30
+13,13,Grilled Chicken Breast,Mains,17.95,5.20
+14,14,Ribeye Steak,Mains,26.50,9.80
+15,15,Fish and Chips,Mains,16.95,5.60
+16,16,BBQ Baby Back Ribs,Mains,22.50,8.10
+17,17,Chicken Parmesan,Mains,18.50,5.90
+18,18,Shrimp Scampi,Mains,19.95,6.70
+19,19,Vegetable Stir Fry,Mains,15.50,4.20
+20,20,Caesar Salad,Salads,11.50,2.90
+21,21,Cobb Salad,Salads,13.95,4.10
+22,22,Greek Salad,Salads,12.50,3.40
+23,23,Grilled Chicken Salad,Salads,14.50,4.30
+24,24,House Garden Salad,Salads,9.50,2.20
+25,25,Chocolate Lava Cake,Desserts,8.50,2.10
+26,26,New York Cheesecake,Desserts,7.95,1.90
+27,27,Apple Pie,Desserts,7.50,1.80
+28,28,Ice Cream Sundae,Desserts,6.95,1.50
+29,29,Key Lime Pie,Desserts,7.95,1.90
+30,30,Soft Drink,Beverages,3.25,0.40
+31,31,Iced Tea,Beverages,3.25,0.35
+32,32,Coffee,Beverages,3.50,0.50
+33,33,Craft Beer,Beverages,7.50,2.20
+34,34,House Wine (Glass),Beverages,9.50,2.80
+35,35,Lemonade,Beverages,3.50,0.45
+36,36,Sparkling Water,Beverages,3.95,0.60
+37,37,Kids Chicken Tenders,Kids,7.95,2.30
+38,38,Kids Mac and Cheese,Kids,6.95,1.80
+39,39,Kids Mini Burger,Kids,7.50,2.10
+40,40,Kids Grilled Cheese,Kids,6.50,1.60
