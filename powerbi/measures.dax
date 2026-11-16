@@ -1,0 +1,107 @@
+// DAX measures for the restaurant BI report.
+//
+// Each measure's home table is noted above it — that's the table you select
+// in the Data pane before clicking "New measure" (see BUILD_GUIDE.md, step 4).
+// Home table doesn't change how a measure behaves (a measure can reference
+// any table in the model), it's just where it's organized for browsing.
+
+// ============================================================
+// Home table: fact_daily_sales
+// ============================================================
+
+// Total Sales
+// The headline sales number. Pulled from fact_daily_sales (the day-grain
+// fact, one row per calendar day) rather than fact_order_line, because it's
+// the table that matches what a GM would recognize from a daily flash
+// report — and it's the fact this project's reconciliation check exists to
+// protect.
+Total Sales = SUM(fact_daily_sales[sales])
+
+// Total Covers
+// Total guests served.
+Total Covers = SUM(fact_daily_sales[covers])
+
+// Avg Check
+// Sales per guest. DIVIDE (not sales/covers with "/") returns blank instead
+// of erroring on closed days, where covers is 0.
+Avg Check = DIVIDE([Total Sales], [Total Covers])
+
+// Sales LY
+// Same metric, shifted back exactly one year. Requires dim_date to be
+// marked as the model's official date table (BUILD_GUIDE.md step 3) —
+// without that, SAMEPERIODLASTYEAR doesn't know how to walk the calendar.
+Sales LY = CALCULATE([Total Sales], SAMEPERIODLASTYEAR(dim_date[date]))
+
+// Sales YoY %
+// % change vs. the same period last year. DIVIDE returns blank for the
+// first year in the data, which has no prior year to compare against,
+// instead of a divide-by-zero error.
+Sales YoY % = DIVIDE([Total Sales] - [Sales LY], [Sales LY])
+
+// Sales 7-Day Rolling Avg
+// Trailing 7-day average ending on the last date in the current filter
+// context. DAX equivalent of sql/05_analysis.sql's vw_rolling_sales, but
+// this version recalculates live as the report is filtered/sliced.
+Sales 7-Day Rolling Avg =
+AVERAGEX(
+    DATESINPERIOD(dim_date[date], MAX(dim_date[date]), -7, DAY),
+    [Total Sales]
+)
+
+// Weekend/Weekday Ratio
+// The number the whole daily-sales simulation was calibrated against (see
+// the main README's "Calibration approach" table — target was ~2.0x).
+// AVERAGE skips blank sales, so POS-outage days drop out on their own;
+// closed days (a true $0) are filtered out explicitly. That matches the
+// definition in sql/05_analysis.sql's vw_weekday_weekend, so both layers
+// report the same 2.04. Dividing by a count of calendar days instead would
+// quietly count outage days as $0 days and drag the averages down.
+Weekend/Weekday Ratio =
+VAR AvgWeekendSales =
+    CALCULATE(AVERAGE(fact_daily_sales[sales]), dim_date[is_weekend] = TRUE, fact_daily_sales[is_closed] = FALSE)
+VAR AvgWeekdaySales =
+    CALCULATE(AVERAGE(fact_daily_sales[sales]), dim_date[is_weekend] = FALSE, fact_daily_sales[is_closed] = FALSE)
+RETURN
+    DIVIDE(AvgWeekendSales, AvgWeekdaySales)
+
+// ============================================================
+// Home table: fact_order_line
+// ============================================================
+
+// Orders
+// order_id repeats once per line in fact_order_line, so DISTINCTCOUNT (not
+// COUNTROWS) is what gives the actual number of orders, not the number of
+// items ordered.
+Orders = DISTINCTCOUNT(fact_order_line[order_id])
+
+// Avg Order Value
+// Sales per ticket. Computed from fact_order_line because fact_daily_sales
+// has no order_id to count orders against.
+Avg Order Value = DIVIDE(SUM(fact_order_line[net_sales]), [Orders])
+
+// Category Share %
+// Current category's share of order-line sales. ALL(dim_menu_item[category])
+// clears only the category filter, so a date or daypart slicer on the report
+// still narrows both the numerator and the denominator together.
+Category Share % =
+DIVIDE(
+    SUM(fact_order_line[net_sales]),
+    CALCULATE(SUM(fact_order_line[net_sales]), ALL(dim_menu_item[category]))
+)
+
+// Food Cost %
+// Cost of goods sold as a % of net sales. food_cost is never rescaled by
+// the per-day reconciliation factor applied to net_sales (see
+// simulate_transactions.py's comment on why), so this stays a faithful COGS
+// ratio even though net_sales includes that adjustment.
+Food Cost % = DIVIDE(SUM(fact_order_line[food_cost]), SUM(fact_order_line[net_sales]))
+
+// Item Sales Rank
+// Rank of the current item by total net sales. ALL(dim_menu_item[item_name])
+// clears only the item filter, so any category filter stays in place: in a
+// visual that also shows category, items outside the current category score
+// blank and fall to the bottom, which makes this a rank *within* category —
+// the DAX equivalent of RANK() OVER (PARTITION BY category ...) in
+// sql/05_analysis.sql. In a visual with no category, it ranks the whole menu.
+Item Sales Rank =
+RANKX(ALL(dim_menu_item[item_name]), CALCULATE(SUM(fact_order_line[net_sales])), , DESC)
