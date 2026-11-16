@@ -13,7 +13,7 @@ data/           daily_sales.csv/.parquet, orders.parquet, order_lines.parquet, m
 notebooks/      01_eda.ipynb, 02_modeling.ipynb
 src/            simulate_restaurant_sales.py, simulate_transactions.py, build_warehouse.py, export_powerbi.py
 sql/            01_staging.sql .. 05_analysis.sql (DuckDB star schema + quality checks + analysis views)
-sql/tsql/       the same pipeline in SQL Server T-SQL, with a DuckDB vs. T-SQL comparison
+sql_server/     the same pipeline in SQL Server T-SQL, run_all.sh, and the DuckDB reconciliation
 warehouse/      restaurant.duckdb (built, not committed — see "BI Layer" below)
 powerbi/        BUILD_GUIDE.md, measures.dax, data/*.csv
 ```
@@ -170,16 +170,54 @@ POS-outage days, and no negative amounts.
 Then follow [`powerbi/BUILD_GUIDE.md`](powerbi/BUILD_GUIDE.md) to build the
 report in the Power BI service (no Power BI Desktop required).
 
-The same warehouse is also written in SQL Server T-SQL in
-[`sql/tsql/`](sql/tsql/), with primary/foreign key constraints, run steps
-for SQL Server in Docker, and a table of every DuckDB → T-SQL difference.
-
 **Executive Overview page** — built by following
 [`powerbi/PAGE1_GUIDE.md`](powerbi/PAGE1_GUIDE.md), with every card and
 chart value listed in [`powerbi/EXPECTED_VALUES.md`](powerbi/EXPECTED_VALUES.md)
 for checking:
 
 *Executive Overview screenshot goes here: `powerbi/screenshots/executive-overview.png`*
+
+### SQL Server port
+
+The same warehouse is written in T-SQL in [`sql_server/`](sql_server/),
+with named primary and foreign key constraints on every dimension and fact.
+It has been run end to end on **Microsoft SQL Server 2022 (Developer
+Edition) in Docker** on an Apple Silicon Mac.
+
+**Run it** (Docker Desktop and `sqlcmd` installed, SQL Server container
+started — full steps in [`sql_server/README.md`](sql_server/README.md)):
+
+```bash
+bash sql_server/run_all.sh            # CSV inputs, database, 01-05, fails on any quality check
+python src/reconcile_sqlserver.py     # compares SQL Server with DuckDB
+```
+
+**Reconciliation result:** all **78 of 78** comparisons between the SQL Server
+and DuckDB builds match ([`sql_server/RECONCILIATION.md`](sql_server/RECONCILIATION.md)).
+That covers row counts for all 11 tables, total sales ($6,648,517.59), food
+cost, covers and orders, sales for each of the 32 months, the top 5 items,
+row counts of all 7 views, and key values inside them (weekend/weekday ratio
+2.04, snow −31.4%). All 13 quality checks pass on SQL Server too. In a
+failure test, one bad row made the checks fail the run with a non-zero exit
+code.
+
+**Dialect differences hit along the way** (full table in
+[`sql_server/README.md`](sql_server/README.md#duckdb-vs-t-sql-what-had-to-change)):
+
+- **Date functions:** `strftime` → `CONVERT(..., 112)`, `last_day(make_date())`
+  → `EOMONTH(DATEFROMPARTS())`, and `dayofweek()` → `DATEPART(WEEKDAY)`
+  adjusted by `@@DATEFIRST`, which otherwise depends on a server setting.
+- **`CREATE OR REPLACE`:** no `CREATE OR REPLACE TABLE` in T-SQL
+  (`DROP TABLE IF EXISTS` + `CREATE TABLE`/`SELECT INTO` instead). Views use
+  `CREATE OR ALTER VIEW`, one per batch, with no `ORDER BY`.
+- **`LIMIT` vs `TOP`:** `ORDER BY ... LIMIT 5` becomes `SELECT TOP 5 ... ORDER BY`.
+- **String concatenation:** `||` becomes `+`.
+- **Rolling windows:** T-SQL can't do `RANGE BETWEEN INTERVAL 6 DAYS
+  PRECEDING`, so the 7-day average uses a one-row-per-day date spine with
+  `ROWS BETWEEN 6 PRECEDING`. The results match DuckDB for all 930 days.
+- **Loading:** no parquet reader, so files go through `BULK INSERT` into
+  text staging tables. Its `CODEPAGE` option isn't supported on SQL Server
+  for Linux.
 
 ### Key findings
 
