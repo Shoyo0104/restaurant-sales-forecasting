@@ -13,6 +13,7 @@ data/           daily_sales.csv/.parquet, orders.parquet, order_lines.parquet, m
 notebooks/      01_eda.ipynb, 02_modeling.ipynb
 src/            simulate_restaurant_sales.py, simulate_transactions.py, build_warehouse.py, export_powerbi.py
 sql/            01_staging.sql .. 05_analysis.sql (DuckDB star schema + quality checks + analysis views)
+sql/tsql/       the same pipeline in SQL Server T-SQL, with a DuckDB vs. T-SQL comparison
 warehouse/      restaurant.duckdb (built, not committed — see "BI Layer" below)
 powerbi/        BUILD_GUIDE.md, measures.dax, data/*.csv
 ```
@@ -167,6 +168,10 @@ POS-outage days, and no negative amounts.
 
 Then follow [`powerbi/BUILD_GUIDE.md`](powerbi/BUILD_GUIDE.md) to build the
 report in the Power BI service (no Power BI Desktop required).
+
+The same warehouse is also written in SQL Server T-SQL in
+[`sql/tsql/`](sql/tsql/), with primary/foreign key constraints, run steps
+for SQL Server in Docker, and a table of every DuckDB → T-SQL difference.
 
 *Screenshots of the finished report go here once it's built —*
 *`powerbi/screenshots/executive-overview.png` and*
