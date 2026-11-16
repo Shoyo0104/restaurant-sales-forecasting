@@ -175,7 +175,7 @@ report in the Power BI service (no Power BI Desktop required).
 chart value listed in [`powerbi/EXPECTED_VALUES.md`](powerbi/EXPECTED_VALUES.md)
 for checking:
 
-*Executive Overview screenshot goes here: `powerbi/screenshots/executive-overview.png`*
+![Executive Overview page](powerbi/screenshots/executive-overview.png)
 
 ### SQL Server port
 
