@@ -9,22 +9,17 @@
 // Home table: fact_daily_sales
 // ============================================================
 
-// Total Sales
-// The headline sales number. Pulled from fact_daily_sales (the day-grain
-// fact, one row per calendar day) rather than fact_order_line, because it's
-// the table that matches what a GM would recognize from a daily flash
-// report — and it's the fact this project's reconciliation check exists to
-// protect.
-Total Sales = SUM(fact_daily_sales[sales])
-
 // Total Covers
 // Total guests served.
 Total Covers = SUM(fact_daily_sales[covers])
 
 // Avg Check
-// Sales per guest. DIVIDE (not sales/covers with "/") returns blank instead
-// of erroring on closed days, where covers is 0.
-Avg Check = DIVIDE([Total Sales], [Total Covers])
+// Sales per guest. Both halves come from fact_daily_sales on purpose: covers
+// only exist at the day grain, so a daypart or menu slicer can't narrow
+// them — mixing in [Total Sales] (order-line based) would divide Dinner-only
+// sales by all-day covers. DIVIDE returns blank instead of erroring on
+// closed days, where covers is 0.
+Avg Check = DIVIDE(SUM(fact_daily_sales[sales]), [Total Covers])
 
 // Sales LY
 // Same metric, shifted back exactly one year. Requires dim_date to be
@@ -68,6 +63,23 @@ RETURN
 // Home table: fact_order_line
 // ============================================================
 
+// Total Sales
+// The headline sales number, summed from fact_order_line. dim_daypart,
+// dim_channel and dim_menu_item only have relationships to fact_order_line,
+// so a Daypart, Channel or Category slicer can only filter measures built on
+// that table — from fact_daily_sales this card would ignore those slicers.
+// Unfiltered, the two facts agree to the cent: sql/04_quality_checks.sql
+// fails the build if any day's order lines are more than $1 off the daily
+// total.
+Total Sales = SUM(fact_order_line[net_sales])
+
+// Avg Daily Sales
+// Average sales per trading day in the current filter context (e.g. per
+// weekday bar). AVERAGEX walks the dates and averages [Total Sales] for
+// each; closed and POS-outage days have no order lines, so their value is
+// blank and AVERAGEX skips them instead of counting them as $0 days.
+Avg Daily Sales = AVERAGEX(VALUES(dim_date[date]), [Total Sales])
+
 // Orders
 // order_id repeats once per line in fact_order_line, so DISTINCTCOUNT (not
 // COUNTROWS) is what gives the actual number of orders, not the number of
@@ -77,7 +89,7 @@ Orders = DISTINCTCOUNT(fact_order_line[order_id])
 // Avg Order Value
 // Sales per ticket. Computed from fact_order_line because fact_daily_sales
 // has no order_id to count orders against.
-Avg Order Value = DIVIDE(SUM(fact_order_line[net_sales]), [Orders])
+Avg Order Value = DIVIDE([Total Sales], [Orders])
 
 // Category Share %
 // Current category's share of order-line sales. ALL(dim_menu_item[category])

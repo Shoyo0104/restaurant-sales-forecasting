@@ -158,6 +158,7 @@ pip install -r requirements.txt
 python src/simulate_transactions.py   # generates data/{menu_items.csv,orders.parquet,order_lines.parquet}
 python src/build_warehouse.py         # builds warehouse/restaurant.duckdb, runs quality checks + analysis views
 python src/export_powerbi.py          # exports dim_/fact_ tables to powerbi/data/*.csv
+python src/expected_values.py         # writes powerbi/EXPECTED_VALUES.md (numbers to check the report against)
 ```
 
 `build_warehouse.py` exits non-zero if any of the 13 checks in
@@ -173,9 +174,12 @@ The same warehouse is also written in SQL Server T-SQL in
 [`sql/tsql/`](sql/tsql/), with primary/foreign key constraints, run steps
 for SQL Server in Docker, and a table of every DuckDB → T-SQL difference.
 
-*Screenshots of the finished report go here once it's built —*
-*`powerbi/screenshots/executive-overview.png` and*
-*`powerbi/screenshots/menu-daypart.png`.*
+**Executive Overview page** — built by following
+[`powerbi/PAGE1_GUIDE.md`](powerbi/PAGE1_GUIDE.md), with every card and
+chart value listed in [`powerbi/EXPECTED_VALUES.md`](powerbi/EXPECTED_VALUES.md)
+for checking:
+
+*Executive Overview screenshot goes here: `powerbi/screenshots/executive-overview.png`*
 
 ### Key findings
 

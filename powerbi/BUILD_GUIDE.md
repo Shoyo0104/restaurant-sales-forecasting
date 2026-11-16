@@ -121,63 +121,24 @@ the diagram-drag flow) to save it.
 ## 5. Add the measures
 
 In the Data pane, select the table named in each measure's comment in
-[`measures.dax`](measures.dax) (e.g. `Total Sales` goes on `fact_daily_sales`),
-then select **New measure** in the ribbon. Paste in the measure's full
-definition (the formula bar accepts multi-line DAX, including comments —
-the DAX editor on the web has the same autocomplete/IntelliSense as
-Desktop). Repeat for all 12 measures.
+[`measures.dax`](measures.dax) (e.g. `Total Covers` goes on `fact_daily_sales`,
+`Total Sales` on `fact_order_line`), then select **New measure** in the
+ribbon. Paste in the measure's full definition (the formula bar accepts
+multi-line DAX, including comments — the DAX editor on the web has the same
+autocomplete/IntelliSense as Desktop). Repeat for all 13 measures.
 
 ## 6. Build the reports
 
-Once the model has all 7 tables, 6 relationships, and 12 measures, select
+Once the model has all 7 tables, 6 relationships, and 13 measures, select
 **New report** in the model editor's ribbon. This opens the browser report
 editor — the same visual-authoring canvas, Visualizations pane, Fields
 well, and Filters pane as Desktop, just running in the browser.
 
 ### Page 1: "Executive Overview"
 
-**Page-level slicers** (drag onto empty canvas space; by default a slicer filters every visual on its page):
-- Slicer: `dim_date[year]`
-- Slicer: `dim_date[month_name]`
-
-**Row 1 — KPI cards** (Card visual, one measure each):
-- `[Total Sales]`
-- `[Total Covers]`
-- `[Avg Check]`
-- `[Orders]`
-
-**Row 2:**
-- **Monthly sales vs LY** — Line chart. X-axis: `dim_date[year_month]`.
-  Y-axis: `[Total Sales]`, `[Sales LY]`.
-- **YoY % by month** — Line chart. X-axis: `dim_date[year_month]`.
-  Y-axis: `[Sales YoY %]`. Format the measure as a percentage (select the
-  measure in the Data pane → Properties → Format → Percentage).
-
-> **Expect one odd point:** the data starts on 23 Dec 2023, so
-> **Dec 2024**'s "last year" only has 9 days of sales behind it and its
-> YoY % will spike. That's a real data-coverage artifact, not a bug — good
-> to point at in a demo. (July 2026 is also partial, but it's fine:
-> `SAMEPERIODLASTYEAR` shifts the exact dates in context, so 1–19 July 2026
-> is compared with 1–19 July 2025.) The SQL view
-> `vw_monthly_sales_yoy` handles the same issue by comparing average sales
-> per trading day and leaving partial months out of YoY.
-
-**Row 3:**
-- **Daily sales with 7-day rolling average** — Line chart. X-axis:
-  `dim_date[date]`. Y-axis: `[Total Sales]`, `[Sales 7-Day Rolling Avg]`.
-  The raw daily line is noisy (weekends double weekdays); the rolling
-  average is what shows the seasonal shape.
-
-**Row 4:**
-- **Sales by day of week** — Clustered column chart. X-axis:
-  `dim_date[day_of_week]` (already sorted Sun → Sat from step 3). Y-axis:
-  drag `fact_daily_sales[sales]` and change its aggregation (click the field
-  in the well → **Average**, not Sum) so bars show the typical day, not a
-  total skewed by how many of each weekday occurred. Add
-  `[Weekend/Weekday Ratio]` as a Card nearby for context.
-- **Avg sales by weather** — Clustered bar chart. Axis:
-  `dim_weather[weather_label]`. Values: `fact_daily_sales[sales]`,
-  aggregation set to **Average**.
+Follow [`PAGE1_GUIDE.md`](PAGE1_GUIDE.md) — a click-by-click walkthrough
+for this page, with the exact numbers to check against in
+[`EXPECTED_VALUES.md`](EXPECTED_VALUES.md).
 
 ### Page 2: "Menu & Daypart"
 
@@ -207,6 +168,22 @@ well, and Filters pane as Desktop, just running in the browser.
   (sort by `dim_daypart[sort_order]` so it reads Lunch → Afternoon → Dinner
   → Late, not alphabetically). Columns: `dim_channel[channel]`. Values:
   `SUM(fact_order_line[net_sales])` and `[Orders]`.
+
+### Page 3 (optional): "Trends & Weather"
+
+Uses the measures the first two pages don't. No slicers on this page.
+
+- **Daily sales with 7-day rolling average** — Line chart. X-axis:
+  `dim_date[date]`. Y-axis: `[Total Sales]`, `[Sales 7-Day Rolling Avg]`.
+  The raw daily line is noisy (weekends double weekdays); the rolling
+  average shows the seasonal shape.
+- **KPI cards:** `[Weekend/Weekday Ratio]` (should show 2.04), `[Avg Check]`,
+  `[Total Covers]`.
+- **Avg sales by weather** — Clustered bar chart. Y-axis:
+  `dim_weather[weather_label]`. X-axis: `fact_daily_sales[sales]` with its
+  aggregation changed to **Average** (click the field in the well →
+  Average). Weather lives on `fact_daily_sales` only, which is why this one
+  uses the daily fact directly.
 
 ## Where Desktop has something the web doesn't
 
