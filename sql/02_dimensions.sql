@@ -27,7 +27,8 @@ SELECT
     is_grad_season,
     is_major_sporting_event_window,
     is_special_day
-FROM stg_daily_sales;
+FROM stg_daily_sales
+ORDER BY date;
 
 -- dim_menu_item: one row per menu item. item_id already comes out of the
 -- generator as a small, dense, stable integer, so it's reused directly as
@@ -43,7 +44,8 @@ SELECT
     category,
     price,
     food_cost
-FROM stg_menu_items;
+FROM stg_menu_items
+ORDER BY item_id;
 
 -- dim_daypart: small, hand-built dimension. sort_order exists purely so
 -- charts/slicers show Lunch -> Afternoon -> Dinner -> Late instead of
