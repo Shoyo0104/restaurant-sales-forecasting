@@ -6,38 +6,64 @@
 -- vw_monthly_sales_yoy: monthly sales with year-over-year % change.
 -- LAG(..., 1) PARTITION BY month lines up "this month" against "the same
 -- month last year" without a self-join.
+-- YoY is computed on average sales per trading day, not the raw monthly
+-- total: the data starts mid-December 2023 and ends mid-July 2026, and POS
+-- outages remove a day here and there, so comparing raw totals would report
+-- a fake +290% for Dec 2024 (vs. a 9-day Dec 2023). Months the data doesn't
+-- fully cover are flagged and get no YoY at all.
 CREATE OR REPLACE VIEW vw_monthly_sales_yoy AS
 WITH monthly AS (
-    SELECT dd.year, dd.month, SUM(fds.sales) AS monthly_sales
+    SELECT
+        dd.year,
+        dd.month,
+        COUNT(*)                                       AS calendar_days_in_data,
+        COUNT(fds.sales) FILTER (WHERE NOT fds.is_closed) AS trading_days,
+        SUM(fds.sales)                                 AS monthly_sales
     FROM fact_daily_sales fds
     JOIN dim_date dd ON fds.date_key = dd.date_key
-    WHERE NOT fds.is_closed AND NOT fds.is_pos_outage
     GROUP BY dd.year, dd.month
+),
+with_avg AS (
+    SELECT
+        *,
+        -- last_day() gives the month's real length, so a month the data only
+        -- partly covers can be told apart from a full one.
+        calendar_days_in_data < day(last_day(make_date(year, month, 1))) AS is_partial_month,
+        monthly_sales / trading_days AS avg_daily_sales
+    FROM monthly
+),
+with_ly AS (
+    SELECT
+        *,
+        LAG(avg_daily_sales)  OVER (PARTITION BY month ORDER BY year) AS avg_daily_sales_ly,
+        LAG(is_partial_month) OVER (PARTITION BY month ORDER BY year) AS ly_is_partial_month
+    FROM with_avg
 )
 SELECT
     year,
     month,
     monthly_sales,
-    LAG(monthly_sales) OVER (PARTITION BY month ORDER BY year) AS monthly_sales_ly,
-    ROUND(
-        100.0 * (monthly_sales - LAG(monthly_sales) OVER (PARTITION BY month ORDER BY year))
-        / LAG(monthly_sales) OVER (PARTITION BY month ORDER BY year),
-        1
-    ) AS yoy_pct_change
-FROM monthly
+    trading_days,
+    is_partial_month,
+    ROUND(avg_daily_sales, 2)    AS avg_daily_sales,
+    ROUND(avg_daily_sales_ly, 2) AS avg_daily_sales_ly,
+    CASE WHEN NOT is_partial_month AND NOT ly_is_partial_month
+         THEN ROUND(100.0 * (avg_daily_sales - avg_daily_sales_ly) / avg_daily_sales_ly, 1)
+    END AS yoy_pct_change
+FROM with_ly
 ORDER BY year, month;
 
--- vw_rolling_sales: 7-day and 28-day trailing average sales. Windows are
--- defined over calendar order, not row count, but since outage days are
--- excluded (no sales value to average) the window silently skips those
--- gaps rather than mis-measuring the usual 7/28-day span — a known, minor
--- simplification worth calling out in an interview.
+-- vw_rolling_sales: 7-day and 28-day trailing average sales.
+-- RANGE with a date INTERVAL (not ROWS BETWEEN 6 PRECEDING) so the window
+-- always spans 7 calendar days: with ROWS, a skipped outage day would make
+-- the "7-day" window silently reach back 8 days. Closed/outage days are
+-- excluded, so those days just contribute nothing to the average.
 CREATE OR REPLACE VIEW vw_rolling_sales AS
 SELECT
     dd.date,
     fds.sales,
-    AVG(fds.sales) OVER (ORDER BY dd.date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)  AS rolling_7d_avg,
-    AVG(fds.sales) OVER (ORDER BY dd.date ROWS BETWEEN 27 PRECEDING AND CURRENT ROW) AS rolling_28d_avg
+    AVG(fds.sales) OVER (ORDER BY dd.date RANGE BETWEEN INTERVAL 6 DAYS PRECEDING AND CURRENT ROW)  AS rolling_7d_avg,
+    AVG(fds.sales) OVER (ORDER BY dd.date RANGE BETWEEN INTERVAL 27 DAYS PRECEDING AND CURRENT ROW) AS rolling_28d_avg
 FROM fact_daily_sales fds
 JOIN dim_date dd ON fds.date_key = dd.date_key
 WHERE NOT fds.is_closed AND NOT fds.is_pos_outage

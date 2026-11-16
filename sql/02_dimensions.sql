@@ -17,6 +17,10 @@ SELECT
     is_weekend,
     month,
     monthname(date)                           AS month_name,
+    -- 'YYYY-MM' sorts correctly as plain text, which makes it a ready-made
+    -- monthly axis in Power BI (marking dim_date as the date table turns off
+    -- Power BI's automatic date hierarchy, so this replaces it).
+    strftime(date, '%Y-%m')                   AS year_month,
     quarter(date)                             AS quarter,
     year(date)                                AS year,
     is_major_holiday,

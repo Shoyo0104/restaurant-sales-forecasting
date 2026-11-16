@@ -15,6 +15,26 @@ FROM dim_menu_item
 GROUP BY item_key
 HAVING COUNT(*) > 1;
 
+-- CHECK: fact_daily_sales grain holds (exactly one row per date_key)
+SELECT date_key, COUNT(*) AS n
+FROM fact_daily_sales
+GROUP BY date_key
+HAVING COUNT(*) > 1;
+
+-- CHECK: fact_order_line grain holds (exactly one row per order_line_id)
+SELECT order_line_id, COUNT(*) AS n
+FROM fact_order_line
+GROUP BY order_line_id
+HAVING COUNT(*) > 1;
+
+-- CHECK: fact_daily_sales has no orphan or missing weather_key
+-- (it's built with a LEFT JOIN to dim_weather, so an unknown weather code
+-- would otherwise land as a silent NULL instead of failing the build)
+SELECT fds.*
+FROM fact_daily_sales fds
+LEFT JOIN dim_weather dw ON fds.weather_key = dw.weather_key
+WHERE dw.weather_key IS NULL;
+
 -- CHECK: fact_order_line has no orphan date_key (every line's date exists in dim_date)
 SELECT fol.*
 FROM fact_order_line fol
