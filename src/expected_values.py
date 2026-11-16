@@ -10,9 +10,12 @@ Each query mirrors how the DAX measures in powerbi/measures.dax evaluate:
     Daypart) and replaces the dates in context with the same dates one year
     earlier. Every context on this page is a contiguous date range (all
     dates, one year, or one month), so the LY range is [start - 1 year,
-    end - 1 year] — extended to the month's last day when the context ends
-    on a month end, which is how DAX shifts whole months (Feb 2025 -> all
-    29 days of Feb 2024).
+    end - 1 year], extended to the end of that month whenever the context
+    ends on the last date its month has *in dim_date*. That's how DAX
+    shifts whole months: Feb 2025 -> all 29 days of Feb 2024, and because
+    the data stops on 19 Jul 2026, July 2026 counts as a "whole" month and
+    is compared with all of July 2025. Verified against Power BI's own
+    results with DAX queries in the service.
   - [Avg Daily Sales] averages [Total Sales] per date and skips blanks, i.e.
     days with no matching order lines (closed / POS-outage days).
 
@@ -58,9 +61,12 @@ def sales_between(start, end, daypart):
 
 def ly_range(start, end):
     """Date range SAMEPERIODLASTYEAR returns for a contiguous [start, end]."""
+    # The month counts as complete if `end` is the last date that month has
+    # in dim_date — not necessarily the calendar month end.
     return con.execute("""
         SELECT CAST(?::DATE - INTERVAL 1 YEAR AS DATE),
-               CASE WHEN ?::DATE = last_day(?::DATE)
+               CASE WHEN ?::DATE = (SELECT MAX(date) FROM dim_date
+                                     WHERE year_month = strftime(?::DATE, '%Y-%m'))
                     THEN last_day(CAST(?::DATE - INTERVAL 1 YEAR AS DATE))
                     ELSE CAST(?::DATE - INTERVAL 1 YEAR AS DATE) END
     """, [start, end, end, end, end]).fetchone()
@@ -201,7 +207,13 @@ lines_md = [
     "- **Sales LY is blank for Dec 2023 – Nov 2024 on the line chart**: the",
     "  data starts on 23 Dec 2023, so those months have no prior year.",
     "  **Dec 2024's LY** covers only 23–31 Dec 2023.",
-    "- **Jul 2026 is a partial month** (1–19 Jul); its LY is 1–19 Jul 2025.",
+    "- **Jul 2026 only has 1–19 Jul, but its LY is *all* of July 2025.** DAX",
+    "  treats a month as complete when the dates in context reach the last",
+    "  date that month has in the date table, and the data ends on 19 Jul",
+    "  2026. So the Jul 2026 point compares 19 days with 31, and the year-2026",
+    "  YoY compares 1 Jan–19 Jul with 1 Jan–31 Jul 2025. This was confirmed",
+    "  with DAX queries in the Power BI service; it's a real data-coverage",
+    "  effect, not a bug in the measure.",
     "",
 ]
 lines_md += section("Unfiltered (no slicer selected)", None, None)

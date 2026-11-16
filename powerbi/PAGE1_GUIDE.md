@@ -151,7 +151,7 @@ fall in the period.
    Dinner" section.
 3. Clear the slicers when you're done: hover over a slicer → eraser icon.
 
-The unfiltered **Sales YoY %** (+64.15%) looks dramatic but isn't meaningful.
+The unfiltered **Sales YoY %** (+61.25%) looks dramatic but isn't meaningful.
 It compares 2.6 years of data against a "last year" that only has about 1.6
 years in it. That card is meant to be read with a year selected.
 

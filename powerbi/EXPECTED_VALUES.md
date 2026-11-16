@@ -14,11 +14,17 @@ Things that are expected, not bugs:
 - **Sales LY is blank for Dec 2023 – Nov 2024 on the line chart**: the
   data starts on 23 Dec 2023, so those months have no prior year.
   **Dec 2024's LY** covers only 23–31 Dec 2023.
-- **Jul 2026 is a partial month** (1–19 Jul); its LY is 1–19 Jul 2025.
+- **Jul 2026 only has 1–19 Jul, but its LY is *all* of July 2025.** DAX
+  treats a month as complete when the dates in context reach the last
+  date that month has in the date table, and the data ends on 19 Jul
+  2026. So the Jul 2026 point compares 19 days with 31, and the year-2026
+  YoY compares 1 Jan–19 Jul with 1 Jan–31 Jul 2025. This was confirmed
+  with DAX queries in the Power BI service; it's a real data-coverage
+  effect, not a bug in the measure.
 
 ## Unfiltered (no slicer selected)
 
-Date context: 2023-12-23 to 2026-07-19. `[Sales LY]` compares against 2022-12-23 to 2025-07-19.
+Date context: 2023-12-23 to 2026-07-19. `[Sales LY]` compares against 2022-12-23 to 2025-07-31.
 
 ### KPI cards
 
@@ -27,7 +33,7 @@ Date context: 2023-12-23 to 2026-07-19. `[Sales LY]` compares against 2022-12-23
 | Total Sales | $6,648,517.59 |
 | Orders | 91,990 |
 | Avg Order Value | $72.27 |
-| Sales YoY % | +64.15% (LY = $4,050,353.69) |
+| Sales YoY % | +61.25% (LY = $4,123,152.98) |
 
 ### Line chart: monthly Sales vs Sales LY
 
@@ -64,7 +70,7 @@ Date context: 2023-12-23 to 2026-07-19. `[Sales LY]` compares against 2022-12-23
 | 2026-04 | $201,434.00 | $208,391.68 |
 | 2026-05 | $217,963.43 | $235,099.86 |
 | 2026-06 | $252,062.95 | $253,103.39 |
-| 2026-07 | $140,130.88 | $119,830.51 |
+| 2026-07 | $140,130.88 | $192,629.80 |
 
 ### Bar chart: Avg Daily Sales by day of week
 
