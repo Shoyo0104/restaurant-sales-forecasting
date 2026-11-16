@@ -84,16 +84,30 @@ CHANNEL_DINE_IN_PROB = {"Lunch": 0.55, "Afternoon": 0.60, "Dinner": 0.80, "Late"
 PARTY_SIZE_CHOICES = [1, 2, 3, 4, 5, 6]
 PARTY_SIZE_WEIGHTS = [0.20, 0.35, 0.20, 0.15, 0.07, 0.03]
 
-# Category weights per daypart: what guests tend to order at that time of day.
-# Each per-guest line is drawn from these weights, so beverages/desserts show
-# up naturally as "one of the items a guest ordered" rather than being bolted
-# on separately.
-CATEGORY_WEIGHTS_BY_DAYPART = {
-    "Lunch":     {"Appetizers": 0.10, "Burgers": 0.25, "Mains": 0.15, "Salads": 0.20, "Desserts": 0.05, "Beverages": 0.20, "Kids": 0.05},
-    "Afternoon": {"Appetizers": 0.20, "Burgers": 0.15, "Mains": 0.05, "Salads": 0.10, "Desserts": 0.15, "Beverages": 0.35, "Kids": 0.00},
-    "Dinner":    {"Appetizers": 0.15, "Burgers": 0.20, "Mains": 0.30, "Salads": 0.10, "Desserts": 0.07, "Beverages": 0.15, "Kids": 0.03},
-    "Late":      {"Appetizers": 0.25, "Burgers": 0.30, "Mains": 0.05, "Salads": 0.00, "Desserts": 0.10, "Beverages": 0.30, "Kids": 0.00},
+# Entree category weights per daypart: what guests tend to order as their
+# main item at that time of day. Beverages and Desserts are deliberately
+# excluded here and handled as separate attach-rate draws below — if a
+# cheap beverage could be drawn in place of an entree, the average per-guest
+# spend comes out far below daily_sales.csv's avg_check, which would force
+# an oversized reconciliation scale factor in net_sales and make food cost %
+# look artificially low.
+ENTREE_CATEGORY_WEIGHTS_BY_DAYPART = {
+    "Lunch":     {"Appetizers": 0.08, "Burgers": 0.32, "Mains": 0.30, "Salads": 0.25, "Kids": 0.05},
+    "Afternoon": {"Appetizers": 0.25, "Burgers": 0.40, "Mains": 0.20, "Salads": 0.15, "Kids": 0.00},
+    "Dinner":    {"Appetizers": 0.08, "Burgers": 0.25, "Mains": 0.52, "Salads": 0.12, "Kids": 0.03},
+    "Late":      {"Appetizers": 0.20, "Burgers": 0.60, "Mains": 0.20, "Salads": 0.00, "Kids": 0.00},
 }
+
+# Most guests order a drink with their meal, independent of what they ate.
+BEVERAGE_ATTACH_PROB = 0.95
+BEVERAGE_WEIGHTS = {
+    "Soft Drink": 0.22, "Iced Tea": 0.18, "Coffee": 0.15, "Lemonade": 0.15,
+    "Sparkling Water": 0.10, "Craft Beer": 0.12, "House Wine (Glass)": 0.08,
+}
+
+# Shared, table-level add-ons for bigger parties.
+APPETIZER_SHARE_PROB = 0.55  # when party_size >= 2
+DESSERT_SHARE_PROB = 0.40    # when party_size >= 2
 
 
 def _build_menu_frame() -> pd.DataFrame:
@@ -102,11 +116,10 @@ def _build_menu_frame() -> pd.DataFrame:
     return menu
 
 
-def _category_item_pool(menu: pd.DataFrame, daypart: str):
-    """Precompute, for one daypart, the (item_id array, draw-probability array)
-    used to pick a menu item for a single per-guest line. Items within a
-    category split that category's weight evenly."""
-    cat_weights = CATEGORY_WEIGHTS_BY_DAYPART[daypart]
+def _category_item_pool(menu: pd.DataFrame, cat_weights: dict):
+    """Precompute the (item_id array, draw-probability array) used to pick a
+    menu item for a single per-guest entree line, given a category-weight
+    dict. Items within a category split that category's weight evenly."""
     probs = np.zeros(len(menu))
     for i, row in menu.iterrows():
         cat_w = cat_weights.get(row["category"], 0.0)
@@ -114,6 +127,16 @@ def _category_item_pool(menu: pd.DataFrame, daypart: str):
         probs[i] = cat_w / n_in_cat
     probs = probs / probs.sum()
     return menu["item_id"].values, probs
+
+
+def _beverage_pool(menu: pd.DataFrame):
+    """(item_id array, draw-probability array) over just the Beverages
+    category, weighted by BEVERAGE_WEIGHTS (soft drinks ordered more often
+    than, say, a glass of wine)."""
+    bev = menu[menu["category"] == "Beverages"]
+    weights = bev["item_name"].map(BEVERAGE_WEIGHTS).values.astype(float)
+    weights = weights / weights.sum()
+    return bev["item_id"].values, weights
 
 
 def _draw_party_sizes(rng: np.random.Generator, covers: int) -> list:
@@ -139,7 +162,8 @@ def _draw_timestamp(rng: np.random.Generator, date: pd.Timestamp, daypart: str) 
 def simulate_transactions(daily_sales: pd.DataFrame, seed: int = RNG_SEED):
     rng = np.random.default_rng(seed)
     menu = _build_menu_frame()
-    item_pools = {dp: _category_item_pool(menu, dp) for dp in DAYPARTS}
+    entree_pools = {dp: _category_item_pool(menu, ENTREE_CATEGORY_WEIGHTS_BY_DAYPART[dp]) for dp in DAYPARTS}
+    beverage_pool = _beverage_pool(menu)
     item_lookup = menu.set_index("item_id")[["price", "food_cost"]]
 
     order_rows = []
@@ -176,24 +200,38 @@ def simulate_transactions(daily_sales: pd.DataFrame, seed: int = RNG_SEED):
             })
             day_order_ids.append(order_id)
 
-            item_ids, item_probs = item_pools[daypart]
+            entree_ids, entree_probs = entree_pools[daypart]
 
-            # One line per guest: this is each guest's main item (often a
-            # beverage, since beverages carry real weight in the category mix).
-            chosen_items = rng.choice(item_ids, size=party_size, p=item_probs)
-            for item_id in chosen_items:
-                qty = 2 if rng.random() < 0.08 else 1  # occasional double order (e.g. two drinks)
+            # One entree line per guest.
+            chosen_entrees = rng.choice(entree_ids, size=party_size, p=entree_probs)
+            for item_id in chosen_entrees:
                 price, food_cost = item_lookup.loc[item_id]
                 line_rows.append({
                     "order_line_id": line_id, "order_id": order_id, "item_id": int(item_id),
-                    "quantity": qty, "unit_price": price, "food_cost_unit": food_cost,
+                    "quantity": 1, "unit_price": price, "food_cost_unit": food_cost,
                 })
                 day_line_indices.append(len(line_rows) - 1)
                 line_id += 1
 
+            # Most guests also order a drink — modeled as an independent
+            # per-guest attach rate rather than competing with the entree draw.
+            n_beverages = rng.binomial(party_size, BEVERAGE_ATTACH_PROB)
+            if n_beverages > 0:
+                bev_ids, bev_probs = beverage_pool
+                chosen_bevs = rng.choice(bev_ids, size=n_beverages, p=bev_probs)
+                for item_id in chosen_bevs:
+                    qty = 2 if rng.random() < 0.10 else 1  # occasional refill / second round
+                    price, food_cost = item_lookup.loc[item_id]
+                    line_rows.append({
+                        "order_line_id": line_id, "order_id": order_id, "item_id": int(item_id),
+                        "quantity": qty, "unit_price": price, "food_cost_unit": food_cost,
+                    })
+                    day_line_indices.append(len(line_rows) - 1)
+                    line_id += 1
+
             # Larger parties often add a shared appetizer or dessert on top of
             # individual mains — without this, big tables would under-order.
-            if party_size >= 3 and rng.random() < 0.35:
+            if party_size >= 2 and rng.random() < APPETIZER_SHARE_PROB:
                 app_ids = menu.loc[menu["category"] == "Appetizers", "item_id"].values
                 item_id = rng.choice(app_ids)
                 price, food_cost = item_lookup.loc[item_id]
@@ -203,7 +241,7 @@ def simulate_transactions(daily_sales: pd.DataFrame, seed: int = RNG_SEED):
                 })
                 day_line_indices.append(len(line_rows) - 1)
                 line_id += 1
-            if party_size >= 2 and rng.random() < 0.25:
+            if party_size >= 2 and rng.random() < DESSERT_SHARE_PROB:
                 dessert_ids = menu.loc[menu["category"] == "Desserts", "item_id"].values
                 item_id = rng.choice(dessert_ids)
                 price, food_cost = item_lookup.loc[item_id]
