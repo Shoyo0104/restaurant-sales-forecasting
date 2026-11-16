@@ -4,3 +4,7 @@ __pycache__/
 .DS_Store
 .venv/
 venv/
+
+# Rebuilt by src/build_warehouse.py — not worth versioning a binary DB file
+warehouse/*.duckdb
+warehouse/*.duckdb.wal
