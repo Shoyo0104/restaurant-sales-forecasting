@@ -51,13 +51,16 @@ AVERAGEX(
 // Weekend/Weekday Ratio
 // The number the whole daily-sales simulation was calibrated against (see
 // the main README's "Calibration approach" table — target was ~2.0x).
-// Each CALCULATE overrides is_weekend to compute "average sales per day" for
-// just that group, so the ratio is correct even when a date slicer is applied.
+// AVERAGE skips blank sales, so POS-outage days drop out on their own;
+// closed days (a true $0) are filtered out explicitly. That matches the
+// definition in sql/05_analysis.sql's vw_weekday_weekend, so both layers
+// report the same 2.04. Dividing by a count of calendar days instead would
+// quietly count outage days as $0 days and drag the averages down.
 Weekend/Weekday Ratio =
 VAR AvgWeekendSales =
-    CALCULATE(DIVIDE([Total Sales], DISTINCTCOUNT(dim_date[date])), dim_date[is_weekend] = TRUE)
+    CALCULATE(AVERAGE(fact_daily_sales[sales]), dim_date[is_weekend] = TRUE, fact_daily_sales[is_closed] = FALSE)
 VAR AvgWeekdaySales =
-    CALCULATE(DIVIDE([Total Sales], DISTINCTCOUNT(dim_date[date])), dim_date[is_weekend] = FALSE)
+    CALCULATE(AVERAGE(fact_daily_sales[sales]), dim_date[is_weekend] = FALSE, fact_daily_sales[is_closed] = FALSE)
 RETURN
     DIVIDE(AvgWeekendSales, AvgWeekdaySales)
 
@@ -94,9 +97,11 @@ DIVIDE(
 Food Cost % = DIVIDE(SUM(fact_order_line[food_cost]), SUM(fact_order_line[net_sales]))
 
 // Item Sales Rank
-// Rank of the currently filtered item among ALL items by total net sales.
-// ALL(dim_menu_item[item_name]) is what makes this a rank against the whole
-// menu rather than just whatever's left after other filters — the DAX
-// equivalent of the RANK() window function in sql/05_analysis.sql.
+// Rank of the current item by total net sales. ALL(dim_menu_item[item_name])
+// clears only the item filter, so any category filter stays in place: in a
+// visual that also shows category, items outside the current category score
+// blank and fall to the bottom, which makes this a rank *within* category —
+// the DAX equivalent of RANK() OVER (PARTITION BY category ...) in
+// sql/05_analysis.sql. In a visual with no category, it ranks the whole menu.
 Item Sales Rank =
 RANKX(ALL(dim_menu_item[item_name]), CALCULATE(SUM(fact_order_line[net_sales])), , DESC)

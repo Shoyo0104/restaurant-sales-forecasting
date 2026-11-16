@@ -4,7 +4,7 @@ Data is simulated by [`src/simulate_restaurant_sales.py`](src/simulate_restauran
 
 ## Project goal
 
-End-to-end portfolio project: calibrated sales simulation, EDA, and a forecasting model comparison on a proper holdout.
+End-to-end portfolio project: calibrated sales simulation, EDA, and a forecasting model comparison on a proper holdout — plus a [BI layer](#bi-layer) (DuckDB SQL star schema, automated data-quality checks, Power BI report) built on the same data.
 
 ## Repo structure
 
@@ -92,6 +92,7 @@ erDiagram
         string day_of_week
         bool is_weekend
         string month_name
+        string year_month
         int quarter
         int year
     }
@@ -117,6 +118,7 @@ erDiagram
         string weather_label
     }
     fact_order_line {
+        int order_line_id
         int date_key FK
         int item_key FK
         int daypart_key FK
@@ -157,6 +159,12 @@ python src/build_warehouse.py         # builds warehouse/restaurant.duckdb, runs
 python src/export_powerbi.py          # exports dim_/fact_ tables to powerbi/data/*.csv
 ```
 
+`build_warehouse.py` exits non-zero if any of the 13 checks in
+[`sql/04_quality_checks.sql`](sql/04_quality_checks.sql) returns a row:
+primary-key and fact-grain uniqueness, no orphan foreign keys, order lines
+reconciling to the daily sales total within $1, no orders on closed or
+POS-outage days, and no negative amounts.
+
 Then follow [`powerbi/BUILD_GUIDE.md`](powerbi/BUILD_GUIDE.md) to build the
 report in the Power BI service (no Power BI Desktop required).
 
@@ -187,3 +195,9 @@ $6,648,518 in total sales).
 - Ribeye Steak is the single highest-grossing item in the Mains category
   ($410,557), despite also carrying the highest individual food cost on
   the menu ($9.80) — it's a top seller and the most expensive dish to plate.
+
+As with the forecasting results above, these patterns come from effect
+sizes chosen in the simulators (e.g. the daypart/channel mix is set in
+`simulate_transactions.py`), so the SQL is recovering assumptions, not
+discovering facts about a real restaurant. What this layer demonstrates is
+the modeling, the checks, and the analysis queries.

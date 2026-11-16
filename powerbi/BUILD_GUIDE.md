@@ -48,6 +48,13 @@ model editor's ribbon:
 
 You should now see all 7 tables in the **Data pane** on the right.
 
+**Quick type check before moving on:** select a few columns in the Data
+pane and look at their data type in the **Properties** pane. `dim_date[date]`
+must be **Date**, and the `is_...` columns (`is_weekend`, `is_closed`,
+`is_pos_outage`) should be **True/False**. CSV type detection usually gets
+these right; if one came in as Text, change it in Properties — the
+`Weekend/Weekday Ratio` measure and the date-table step both depend on it.
+
 > **Why upload one-table-at-a-time instead of one combined file?** A real
 > warehouse would hand Power BI one CSV per table too — the star schema
 > (separate dims and facts) is the point, not an artifact of the export
@@ -67,6 +74,18 @@ measure) will work correctly.
 4. Select **Save**. Power BI validates that the column has one unique value
    per row and is the right type; this will pass since `dim_date` already
    has exactly one row per calendar day.
+
+Two follow-ups, both because charts sort text alphabetically by default:
+
+- Select `dim_date[month_name]` → in the ribbon/Properties, **Sort by
+  column** → `month`. Otherwise months list as April, August, December...
+- Select `dim_date[day_of_week]` → **Sort by column** → `day_of_week_num`
+  (0 = Sunday), so weekdays read Sun → Sat.
+
+> Marking a date table also switches off Power BI's automatic
+> Year/Quarter/Month hierarchy on `dim_date[date]`. That's expected — use
+> the `year_month` column (text like `2025-03`, which already sorts
+> correctly) wherever you want a monthly axis.
 
 ## 4. Create the relationships
 
@@ -117,7 +136,7 @@ well, and Filters pane as Desktop, just running in the browser.
 
 ### Page 1: "Executive Overview"
 
-**Page-level slicers** (drag onto empty canvas space, apply to both rows below):
+**Page-level slicers** (drag onto empty canvas space; by default a slicer filters every visual on its page):
 - Slicer: `dim_date[year]`
 - Slicer: `dim_date[month_name]`
 
@@ -128,21 +147,34 @@ well, and Filters pane as Desktop, just running in the browser.
 - `[Orders]`
 
 **Row 2:**
-- **Monthly sales vs LY** — Line chart. Axis: `dim_date[date]` (use the
-  auto date hierarchy, drilled to Month). Values: `[Total Sales]`,
-  `[Sales LY]`.
-- **YoY % by month** — Line chart. Axis: same Month level. Values:
-  `[Sales YoY %]`. Format the value axis as a percentage.
+- **Monthly sales vs LY** — Line chart. X-axis: `dim_date[year_month]`.
+  Y-axis: `[Total Sales]`, `[Sales LY]`.
+- **YoY % by month** — Line chart. X-axis: `dim_date[year_month]`.
+  Y-axis: `[Sales YoY %]`. Format the measure as a percentage (select the
+  measure in the Data pane → Properties → Format → Percentage).
+
+> **Expect one odd point:** the data starts on 23 Dec 2023, so
+> **Dec 2024**'s "last year" only has 9 days of sales behind it and its
+> YoY % will spike. That's a real data-coverage artifact, not a bug — good
+> to point at in a demo. (July 2026 is also partial, but it's fine:
+> `SAMEPERIODLASTYEAR` shifts the exact dates in context, so 1–19 July 2026
+> is compared with 1–19 July 2025.) The SQL view
+> `vw_monthly_sales_yoy` handles the same issue by comparing average sales
+> per trading day and leaving partial months out of YoY.
 
 **Row 3:**
-- **Sales by day of week** — Clustered column chart. Axis:
-  `dim_date[day_of_week]`. Values: drag `fact_daily_sales[sales]` and change
-  its aggregation (click the field in the Values well → **Average**, not
-  Sum) so bars show the typical day, not a total skewed by how many of each
-  weekday occurred. Sort the axis by `dim_date[day_of_week_num]` (field's
-  "..." menu → **Sort by column**) so bars read Sun→Sat instead of
-  alphabetically. Add `[Weekend/Weekday Ratio]` as a Card nearby for
-  context.
+- **Daily sales with 7-day rolling average** — Line chart. X-axis:
+  `dim_date[date]`. Y-axis: `[Total Sales]`, `[Sales 7-Day Rolling Avg]`.
+  The raw daily line is noisy (weekends double weekdays); the rolling
+  average is what shows the seasonal shape.
+
+**Row 4:**
+- **Sales by day of week** — Clustered column chart. X-axis:
+  `dim_date[day_of_week]` (already sorted Sun → Sat from step 3). Y-axis:
+  drag `fact_daily_sales[sales]` and change its aggregation (click the field
+  in the well → **Average**, not Sum) so bars show the typical day, not a
+  total skewed by how many of each weekday occurred. Add
+  `[Weekend/Weekday Ratio]` as a Card nearby for context.
 - **Avg sales by weather** — Clustered bar chart. Axis:
   `dim_weather[weather_label]`. Values: `fact_daily_sales[sales]`,
   aggregation set to **Average**.
@@ -153,6 +185,8 @@ well, and Filters pane as Desktop, just running in the browser.
 - Slicer: `dim_menu_item[category]`
 - Slicer: `dim_daypart[daypart]`
 - Slicer: `dim_channel[channel]`
+
+**Row 0 — KPI cards:** `[Orders]`, `[Avg Order Value]`, `[Food Cost %]`.
 
 **Row 1:**
 - **Category share of sales** — Donut chart. Legend: `dim_menu_item[category]`.
