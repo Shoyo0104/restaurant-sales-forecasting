@@ -1,5 +1,7 @@
 -- SQL Server version of sql/02_dimensions.sql.
--- Unlike staging, dimensions get explicit CREATE TABLE with a PRIMARY KEY:
+-- Unlike staging, dimensions get explicit CREATE TABLE with a PRIMARY KEY
+-- (named pk_<table>, so a violation names the table instead of an
+-- auto-generated PK__dim_chan__DC18D475... string):
 -- they're the contract the fact tables and Power BI depend on, so their
 -- types and keys are spelled out rather than inferred from a SELECT INTO.
 
@@ -15,7 +17,7 @@ GO
 -- ---------------------------------------------------------------- dim_date
 DROP TABLE IF EXISTS dim_date;
 CREATE TABLE dim_date (
-    date_key                       INT          NOT NULL PRIMARY KEY,
+    date_key                       INT          NOT NULL CONSTRAINT pk_dim_date PRIMARY KEY,
     [date]                         DATE         NOT NULL,
     day_of_week                    NVARCHAR(10) NOT NULL,
     day_of_week_num                TINYINT      NOT NULL,  -- 0 = Sunday .. 6 = Saturday
@@ -68,7 +70,7 @@ GO
 -- item_id is reused as the surrogate key, same reasoning as the DuckDB version.
 DROP TABLE IF EXISTS dim_menu_item;
 CREATE TABLE dim_menu_item (
-    item_key  INT           NOT NULL PRIMARY KEY,
+    item_key  INT           NOT NULL CONSTRAINT pk_dim_menu_item PRIMARY KEY,
     item_id   INT           NOT NULL,
     item_name NVARCHAR(100) NOT NULL,
     category  NVARCHAR(50)  NOT NULL,
@@ -84,7 +86,7 @@ GO
 -- ---------------------------------------------------------------- small dims
 DROP TABLE IF EXISTS dim_daypart;
 CREATE TABLE dim_daypart (
-    daypart_key INT          NOT NULL PRIMARY KEY,
+    daypart_key INT          NOT NULL CONSTRAINT pk_dim_daypart PRIMARY KEY,
     daypart     NVARCHAR(20) NOT NULL,
     sort_order  TINYINT      NOT NULL
 );
@@ -96,7 +98,7 @@ INSERT INTO dim_daypart VALUES
 
 DROP TABLE IF EXISTS dim_channel;
 CREATE TABLE dim_channel (
-    channel_key INT          NOT NULL PRIMARY KEY,
+    channel_key INT          NOT NULL CONSTRAINT pk_dim_channel PRIMARY KEY,
     channel     NVARCHAR(20) NOT NULL
 );
 INSERT INTO dim_channel VALUES
@@ -105,7 +107,7 @@ INSERT INTO dim_channel VALUES
 
 DROP TABLE IF EXISTS dim_weather;
 CREATE TABLE dim_weather (
-    weather_key   INT          NOT NULL PRIMARY KEY,
+    weather_key   INT          NOT NULL CONSTRAINT pk_dim_weather PRIMARY KEY,
     weather       NVARCHAR(20) NOT NULL,
     weather_label NVARCHAR(20) NOT NULL
 );

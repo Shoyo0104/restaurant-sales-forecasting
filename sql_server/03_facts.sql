@@ -12,11 +12,11 @@ GO
 
 -- ---------------------------------------------------------------- fact_order_line
 CREATE TABLE fact_order_line (
-    order_line_id INT           NOT NULL PRIMARY KEY,
-    date_key      INT           NOT NULL REFERENCES dim_date (date_key),
-    item_key      INT           NOT NULL REFERENCES dim_menu_item (item_key),
-    daypart_key   INT           NOT NULL REFERENCES dim_daypart (daypart_key),
-    channel_key   INT           NOT NULL REFERENCES dim_channel (channel_key),
+    order_line_id INT           NOT NULL CONSTRAINT pk_fact_order_line PRIMARY KEY,
+    date_key      INT           NOT NULL CONSTRAINT fk_fact_order_line_date    REFERENCES dim_date (date_key),
+    item_key      INT           NOT NULL CONSTRAINT fk_fact_order_line_item    REFERENCES dim_menu_item (item_key),
+    daypart_key   INT           NOT NULL CONSTRAINT fk_fact_order_line_daypart REFERENCES dim_daypart (daypart_key),
+    channel_key   INT           NOT NULL CONSTRAINT fk_fact_order_line_channel REFERENCES dim_channel (channel_key),
     order_id      INT           NOT NULL,
     quantity      INT           NOT NULL,
     net_sales     DECIMAL(10,2) NOT NULL,
@@ -50,8 +50,9 @@ GO
 -- weather_key is left nullable to mirror the DuckDB LEFT JOIN; the quality
 -- checks are what flag a NULL there.
 CREATE TABLE fact_daily_sales (
-    date_key       INT           NOT NULL PRIMARY KEY REFERENCES dim_date (date_key),
-    weather_key    INT           NULL     REFERENCES dim_weather (weather_key),
+    date_key       INT           NOT NULL CONSTRAINT pk_fact_daily_sales PRIMARY KEY
+                                          CONSTRAINT fk_fact_daily_sales_date REFERENCES dim_date (date_key),
+    weather_key    INT           NULL     CONSTRAINT fk_fact_daily_sales_weather REFERENCES dim_weather (weather_key),
     covers         INT           NULL,
     sales          DECIMAL(12,2) NULL,
     labor_cost_pct DECIMAL(6,4)  NULL,
